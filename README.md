@@ -2,6 +2,13 @@
 
 Adds folders to Gemini, Protected chats and a cleaner view of the sidebar.
 
+## Legal Notice
+
+Gemini Folders and Protected Files is an independent third-party browser extension.
+It is not affiliated with, endorsed by, sponsored by, authorized by, or otherwise officially connected to Google LLC or the Google Gemini product.
+Google and Gemini are trademarks of Google LLC, used only for descriptive compatibility purposes.
+No official support, warranty, maintenance commitment, or representation is provided by Google for this project.
+
 ## Repository Structure
 
 ```text
@@ -40,4 +47,5 @@ LICENSE
 ## License
 
 This project is licensed under the MIT License. See `LICENSE`.
+
 
