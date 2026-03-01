@@ -26,9 +26,7 @@ LICENSE
 
 ## Load the Extension (Unpacked)
 
-1. Open extensions page:
-   - Chrome: `chrome://extensions`
-   - Opera GX: `opera://extensions`
+1. Open the browsers extensions page
 2. Enable **Developer mode**.
 3. Click **Load unpacked**.
 4. Select the project root folder (the folder that contains `manifest.json`).
@@ -42,3 +40,4 @@ LICENSE
 ## License
 
 This project is licensed under the MIT License. See `LICENSE`.
+
