@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini Folders and Protected Files",
+  "description": "Adds folders to Gemini, Protected chats and a cleaner view of the sidebar",
+  "version": "1.0.0",
+  "icons": {
+    "128": "img/Icon128.png"
+  },
+  "permissions": ["storage", "tabs"],
+  "host_permissions": ["https://gemini.google.com/*"],
+  "action": {
+    "default_title": "Gemini Folders and Protected Files",
+    "default_popup": "src/popup.html",
+    "default_icon": {
+      "128": "img/Icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "js": ["src/shared-chat-utils.js", "src/menu-action-terms.js", "src/folder-emoji-selector.js", "src/content.js", "src/pinned-protection-shared.js", "src/pinned-protection-ui.js"],
+      "css": ["src/styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/emoji-data.json"],
+      "matches": ["https://gemini.google.com/*"]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+# Gemini Folders and Protected Files
+
+Adds folders to Gemini, Protected chats and a cleaner view of the sidebar.
+
+## Repository Structure
+
+```text
+img/
+  Icon128.png
+src/
+  content.js
+  emoji-data.json
+  folder-emoji-selector.js
+  menu-action-terms.js
+  pinned-protection-shared.js
+  pinned-protection-ui.js
+  popup.css
+  popup.html
+  popup.js
+  shared-chat-utils.js
+  styles.css
+manifest.json
+README.md
+LICENSE
+```
+
+## Load the Extension (Unpacked)
+
+1. Open extensions page:
+   - Chrome: `chrome://extensions`
+   - Opera GX: `opera://extensions`
+2. Enable **Developer mode**.
+3. Click **Load unpacked**.
+4. Select the project root folder (the folder that contains `manifest.json`).
+
+## Notes
+
+- Manifest version: MV3
+- Host target: `https://gemini.google.com/*`
+- Sidebar behavior is implemented in `src/content.js`
+
+## License
+
+This project is licensed under the MIT License. See `LICENSE`.

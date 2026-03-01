@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gemini Folders and Protected Files</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <header class="popup-header">
+        <h1>Gemini Folders and Protected Files</h1>
+        <p>Adds folders to Gemini, Protected chats and a cleaner view of the sidebar</p>
+      </header>
+
+      <section class="controls" aria-label="Visual debug settings">
+        <section class="settings-group">
+          <h3>Visual Debug</h3>
+          <p class="settings-note">Debug-only controls for sidebar visuals and action visibility.</p>
+          <label class="toggle-row" for="debugVisualsToggle">
+            <span>Enable debug visuals</span>
+            <input id="debugVisualsToggle" type="checkbox" />
+          </label>
+          <label class="toggle-row" for="debugModeToggle">
+            <span>Enable debug logs</span>
+            <input id="debugModeToggle" type="checkbox" />
+          </label>
+        </section>
+      </section>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,118 @@
+{
+  "version": "local-emoji-dataset-2",
+  "source": "bundled-local",
+  "browserCompatibility": {
+    "flagFallbackBrowsers": [],
+    "flagFallbackDisplay": "country-code"
+  },
+  "languageAliases": {
+    "espanol": "spanish",
+    "castellano": "spanish",
+    "francais": "french",
+    "deutsch": "german",
+    "portugues": "portuguese",
+    "italiano": "italian",
+    "nederlands": "dutch",
+    "arab": "arabic",
+    "farsi": "persian",
+    "russian language": "russian",
+    "ukrainian language": "ukrainian",
+    "polski": "polish",
+    "turkce": "turkish",
+    "hindi language": "hindi",
+    "urdu language": "urdu",
+    "bengla": "bengali",
+    "mandarin chinese": "mandarin",
+    "cantonese chinese": "cantonese",
+    "nihongo": "japanese",
+    "korean language": "korean",
+    "bahasa indonesia": "indonesian",
+    "bahasa melayu": "malay",
+    "filipino language": "filipino",
+    "tagalog language": "tagalog",
+    "svenska": "swedish",
+    "norsk": "norwegian",
+    "dansk": "danish",
+    "suomi": "finnish",
+    "afrikaans language": "afrikaans",
+    "kiswahili": "swahili",
+    "zulu language": "zulu",
+    "xhosa language": "xhosa"
+  },
+  "searchKeywordsByEmoji": {
+    "📁": ["folder", "folders", "directory", "directories", "collection", "group", "bucket"],
+    "📂": ["open folder", "expanded folder", "directory"],
+    "🗂️": ["organize", "organised", "organized", "sorted", "filing"],
+    "📝": ["notes", "memo", "draft", "writing", "text"],
+    "📚": ["books", "reference", "reading", "study", "learn"],
+    "📊": ["analytics", "chart", "dashboard", "metrics", "report"],
+    "📈": ["growth", "increase", "uptrend", "improve", "progress"],
+    "📉": ["decrease", "downtrend", "drop", "decline"],
+    "💼": ["work", "business", "career", "office", "professional"],
+    "💻": ["code", "coding", "developer", "engineering", "software", "tech"],
+    "🎨": ["design", "creative", "art", "ui", "ux", "graphics"],
+    "🎬": ["video", "media", "film", "content"],
+    "🎵": ["music", "audio", "song", "playlist"],
+    "📷": ["photo", "camera", "image", "picture"],
+    "🎯": ["target", "goal", "objective", "focus", "milestone"],
+    "🚀": ["launch", "ship", "release", "fast", "momentum"],
+    "⭐": ["favorite", "important", "starred", "highlight"],
+    "🌟": ["featured", "highlight", "spotlight"],
+    "💡": ["idea", "brainstorm", "insight", "concept"],
+    "🔥": ["urgent", "priority", "hot", "critical"],
+    "🔒": ["private", "secure", "locked", "protected"],
+    "🔧": ["settings", "tooling", "maintenance", "fix"],
+    "⚙️": ["configuration", "settings", "preferences", "setup"],
+    "🏠": ["home", "personal", "main", "default"]
+  },
+  "categories": [
+    {
+      "id": "smileys",
+      "label": "Smileys",
+      "emojis": [
+        "😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🥸", "🤩", "🥳", "😏", "😌", "😔", "😪", "🤤", "😴", "😷", "🤒", "🤕", "🤢", "🤮", "🤧", "🥵", "🥶", "🥴", "😵", "🤯", "😬", "😮", "😯", "😲", "😳", "🥺", "😦", "😧", "😨", "😰", "😥", "😢", "😭", "😱", "😖", "😣", "😞", "😓", "😩", "😫", "😤", "😡", "😠", "🤬", "🤔", "🤭", "🫢", "🫣", "🤫", "🤥", "😶", "🫥", "😐", "🫤", "😑", "🙄", "😮‍💨", "😵‍💫"
+      ]
+    },
+    {
+      "id": "gestures",
+      "label": "Gestures",
+      "emojis": [
+        "👍", "👎", "👌", "🤌", "🤏", "✌️", "🤞", "🫰", "🤟", "🤘", "🤙", "👈", "👉", "👆", "🖕", "👇", "☝️", "👏", "🙌", "🫶", "👐", "🤲", "🙏", "✍️", "💪", "🦾", "🤝", "🫱", "🫲", "🫳", "🫴", "🫵", "👋", "🤚", "🖐️", "✋", "🖖", "👊", "✊", "🤛", "🤜"
+      ]
+    },
+    {
+      "id": "symbols",
+      "label": "Symbols",
+      "emojis": [
+        "❤️", "🧡", "💛", "💚", "🩵", "💙", "💜", "🩷", "🖤", "🩶", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟", "💯", "✨", "⭐", "🌟", "🔥", "💥", "💫", "⚡", "☀️", "🌤️", "⛅", "🌥️", "☁️", "🌦️", "🌧️", "⛈️", "🌩️", "🌨️", "❄️", "☔", "🌈", "🌙", "🌛", "🌜", "🌕", "🌖", "🌗", "🌘", "🌑", "🌒", "🌓", "🌔", "🌍", "🌎", "🌏", "🪐", "🌠", "🌌"
+      ]
+    },
+    {
+      "id": "objects",
+      "label": "Objects",
+      "emojis": [
+        "📁", "📂", "🗂️", "🗃️", "🗄️", "🧾", "📄", "📃", "📑", "📝", "📒", "📓", "📔", "📕", "📗", "📘", "📙", "📚", "📖", "🔖", "🏷️", "📌", "📍", "✂️", "📎", "🖇️", "🧷", "📐", "📏", "🧮", "📊", "📈", "📉", "🗒️", "📰", "🗞️", "🧠", "💡", "🔍", "🔎", "🔬", "🔭", "⚙️", "🔧", "🔨", "🛠️", "🧰", "💻", "🖥️", "⌨️", "🖱️", "🖨️", "📱", "☎️", "📞", "📲", "🔋", "🔌", "🧲", "💾", "💿", "📀", "🧯"
+      ]
+    },
+    {
+      "id": "nature-places",
+      "label": "Nature & Places",
+      "emojis": [
+        "🏠", "🏡", "🏢", "🏬", "🏭", "🏫", "🏛️", "🕍", "⛪", "🕌", "🛕", "🗼", "🗽", "🛣️", "🛤️", "🌳", "🌲", "🌴", "🌵", "🪴", "🌱", "🌿", "☘️", "🍀", "🍁", "🍂", "🍃", "🌾", "🌷", "🌹", "🌺", "🌸", "🌼", "🌻", "🪻", "🪷", "🌊", "🏞️", "🏔️", "⛰️", "🌋", "🪨", "🏝️", "🏖️", "🛶", "⛵", "🚤", "🛥️", "🚢"
+      ]
+    },
+    {
+      "id": "activities",
+      "label": "Activities",
+      "emojis": [
+        "🎯", "🎨", "🎬", "🎵", "🎶", "🎧", "🎤", "🎹", "🎸", "🥁", "🎺", "🎻", "🪗", "📷", "📸", "🎥", "📹", "🎞️", "🎪", "🎭", "🎟️", "🎫", "🎲", "♟️", "🎮", "🕹️", "🎳", "🏓", "🏸", "🏐", "⚽", "🏀", "🏈", "⚾", "🥎", "🎾", "🥊", "🥋", "🎽", "🚀", "🛰️", "🛸", "💎", "🪙", "💰", "💳", "💼", "📦", "🛒", "🧳"
+      ]
+    },
+    {
+      "id": "flags",
+      "label": "Flags",
+      "generate": "regions",
+      "emojis": []
+    }
+  ]
+}
