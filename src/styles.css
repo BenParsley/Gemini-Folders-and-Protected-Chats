@@ -24,6 +24,7 @@ side-navigation-content.gf-sidebar-active {
   --gf-tree-indent-base: 16px;
   --gf-tree-indent-sub: 32px;
   --gf-tree-branch: 10px;
+  --gf-tree-chat-text-gap: 8px;
   --gf-radius-sm: 8px;
   --gf-radius-md: 10px;
   --gf-radius-lg: 12px;
@@ -130,6 +131,7 @@ side-navigation-content.gf-sidebar-active {
   flex-direction: column;
   gap: 9px;
   border-radius: 12px;
+  position: relative;
 }
 
 .gf-search-chats {
@@ -174,7 +176,7 @@ side-navigation-content.gf-sidebar-active {
 
 .gf-folder-body > .gf-chat-item {
   position: relative;
-  padding-left: 34px;
+  padding-left: calc(var(--gf-tree-indent-base) + var(--gf-tree-branch) + var(--gf-tree-chat-text-gap));
   border-radius: 10px;
 }
 
@@ -202,34 +204,10 @@ side-navigation-content.gf-sidebar-active {
   bottom: 50%;
 }
 
-.gf-folder-body > .gf-chat-item:first-child {
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-}
-
-.gf-folder-body > .gf-chat-item:has(+ .gf-chat-item) {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-#gf-sidebar-root.gf-no-has .gf-folder-body > .gf-chat-item.gf-chat-item-has-next {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.gf-folder-body > .gf-chat-item + .gf-chat-item {
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-}
-
 .gf-chat-item:hover {
   background: rgba(255, 255, 255, 0.04);
   box-shadow: inset 0 0 0 1px rgba(178, 186, 194, 0.42);
   border-radius: var(--gf-radius-md);
-}
-
-.gf-depth-0 > .gf-folder-body > .gf-chat-item:hover {
-  border-radius: 0;
 }
 
 .gf-chats .gf-chat-list > .gf-chat-item:hover {
@@ -343,10 +321,6 @@ side-navigation-content.gf-sidebar-active {
   background: transparent;
 }
 
-#gf-sidebar-root.gf-no-has .gf-folder:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
 .gf-folder-head {
   --gf-action-column-offset: var(--gf-action-column-offset-base);
   display: flex;
@@ -377,26 +351,12 @@ side-navigation-content.gf-sidebar-active {
   background: rgba(255, 255, 255, 0.08);
 }
 
-#gf-sidebar-root.gf-no-has .gf-folder-body:hover,
-#gf-sidebar-root.gf-no-has .gf-folder-body:focus-within {
-  background: rgba(255, 255, 255, 0.08);
-}
-
 .gf-folder:has(> .gf-folder-body > .gf-chat-item) > .gf-folder-head {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
 }
 
-#gf-sidebar-root.gf-no-has .gf-folder.gf-folder-has-direct-chats > .gf-folder-head {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
 .gf-folder:has(> .gf-folder-body > .gf-chat-item:hover) {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-#gf-sidebar-root.gf-no-has .gf-folder.gf-folder-has-direct-chats:hover {
   background: rgba(255, 255, 255, 0.04);
 }
 
@@ -434,16 +394,7 @@ side-navigation-content.gf-sidebar-active {
   background: rgba(154, 128, 182, 0.12);
 }
 
-#gf-sidebar-root.gf-no-has.gf-debug-colors .gf-folder-body:hover,
-#gf-sidebar-root.gf-no-has.gf-debug-colors .gf-folder-body:focus-within {
-  background: rgba(154, 128, 182, 0.12);
-}
-
 #gf-sidebar-root.gf-debug-colors .gf-folder:has(> .gf-folder-body > .gf-chat-item:hover) {
-  background: rgba(120, 146, 188, 0.1);
-}
-
-#gf-sidebar-root.gf-no-has.gf-debug-colors .gf-folder:hover {
   background: rgba(120, 146, 188, 0.1);
 }
 
@@ -663,7 +614,7 @@ side-navigation-content.gf-sidebar-active {
   --gf-action-column-offset: var(--gf-action-column-offset-sub);
   position: relative;
   padding-right: calc(var(--gf-action-column-inset) + var(--gf-action-column-offset));
-  padding-left: 48px;
+  padding-left: calc(var(--gf-tree-indent-sub) + var(--gf-tree-branch) + var(--gf-tree-chat-text-gap) + 2px);
 }
 
 .gf-depth-1 > .gf-folder-body > .gf-chat-item::before {
@@ -1258,9 +1209,16 @@ side-navigation-content.gf-sidebar-active {
 .gf-chats-drop-zone.gf-drop-highlight {
   --gf-drop-highlight-expand: var(--gf-chats-drop-highlight-expand, 8px);
   background: #1D252F !important;
-  box-shadow:
-    inset 0 0 0 2px #1a73e8,
-    0 0 0 var(--gf-chats-drop-highlight-expand, 8px) #1D252F;
+  box-shadow: 0 0 0 var(--gf-chats-drop-highlight-expand, 8px) #1D252F;
+}
+
+.gf-chats-drop-zone.gf-drop-highlight::after {
+  content: '';
+  position: absolute;
+  inset: calc(-1 * var(--gf-chats-drop-highlight-expand, 8px));
+  border: 2px solid #1a73e8;
+  border-radius: calc(12px + var(--gf-chats-drop-highlight-expand, 8px));
+  pointer-events: none;
 }
 
 .gf-dragging {

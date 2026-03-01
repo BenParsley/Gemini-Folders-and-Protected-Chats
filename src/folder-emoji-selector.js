@@ -150,7 +150,7 @@
 
   function debugLog(context, error) {
     if (localStorage.getItem('gfDebug') !== '1') return;
-    console.debug('[Gemini Folders and Protected Files Emoji Selector]', context, error);
+    console.debug('[Gemini Folders Emoji Selector]', context, error);
   }
 
   function normalizeEmojiSearchText(value) {
@@ -561,30 +561,15 @@
 
     const renderErrorState = () => {
       const message = folderIconOptionsLoadError || 'Unable to load emojis from emoji-data.json.';
-      body.innerHTML = '';
+      body.innerHTML = `
+        <div class="gf-icon-error">
+          <div class="gf-icon-error-title">Emoji data unavailable</div>
+          <div class="gf-icon-error-text">${message}</div>
+          <button class="gf-icon-retry" type="button">Retry</button>
+        </div>
+      `;
 
-      const errorWrap = document.createElement('div');
-      errorWrap.className = 'gf-icon-error';
-
-      const title = document.createElement('div');
-      title.className = 'gf-icon-error-title';
-      title.textContent = 'Emoji data unavailable';
-
-      const text = document.createElement('div');
-      text.className = 'gf-icon-error-text';
-      text.textContent = message;
-
-      const retryBtn = document.createElement('button');
-      retryBtn.className = 'gf-icon-retry';
-      retryBtn.type = 'button';
-      retryBtn.textContent = 'Retry';
-
-      errorWrap.appendChild(title);
-      errorWrap.appendChild(text);
-      errorWrap.appendChild(retryBtn);
-      body.appendChild(errorWrap);
-
-      retryBtn.addEventListener('click', async () => {
+      body.querySelector('.gf-icon-retry')?.addEventListener('click', async () => {
         await initializePicker(true);
       });
     };

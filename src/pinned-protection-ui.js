@@ -11,7 +11,7 @@
 
   function debugLog(context, payload) {
     if (localStorage.getItem('gfDebug') !== '1') return;
-    console.debug('[Gemini Folders and Protected Files Pinned Protection]', context, payload);
+    console.debug('[Gemini Folders Pinned Protection]', context, payload);
   }
 
   function applyHealthStatus() {
@@ -51,9 +51,6 @@
   function disableActionElement(actionEl, text = 'Protected') {
     if (!actionEl || actionEl.dataset.gfProtectedAction === '1') return;
 
-    const label = actionEl.querySelector('span:last-child') || actionEl.querySelector('.mdc-list-item__primary-text') || actionEl;
-    const originalLabel = (label?.textContent || '').trim();
-
     actionEl.dataset.gfProtectedAction = '1';
     actionEl.classList.add('gf-protected-action');
     actionEl.setAttribute('data-gf-protected', 'true');
@@ -61,14 +58,12 @@
     actionEl.setAttribute('aria-label', 'Protected. Chat cannot be deleted');
     actionEl.setAttribute('title', 'Protected chat cannot be deleted');
     actionEl.setAttribute('tabindex', '-1');
-    if (originalLabel) {
-      actionEl.dataset.gfProtectedOriginalLabel = originalLabel;
-    }
 
     if ('disabled' in actionEl) {
       actionEl.disabled = true;
     }
 
+    const label = actionEl.querySelector('span:last-child') || actionEl.querySelector('.mdc-list-item__primary-text') || actionEl;
     if (label) label.textContent = text;
 
     const guard = (event) => {
@@ -77,55 +72,14 @@
       event.stopImmediatePropagation();
     };
 
-    const keydownGuard = (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        guard(event);
-      }
-    };
-
     actionEl.addEventListener('click', guard, true);
     actionEl.addEventListener('mousedown', guard, true);
     actionEl.addEventListener('mouseup', guard, true);
-    actionEl.addEventListener('keydown', keydownGuard, true);
-    actionEl._gfProtectedGuard = guard;
-    actionEl._gfProtectedKeydownGuard = keydownGuard;
-  }
-
-  function enableActionElement(actionEl) {
-    if (!actionEl || actionEl.dataset.gfProtectedAction !== '1') return;
-
-    const guard = actionEl._gfProtectedGuard;
-    const keydownGuard = actionEl._gfProtectedKeydownGuard;
-    if (guard) {
-      actionEl.removeEventListener('click', guard, true);
-      actionEl.removeEventListener('mousedown', guard, true);
-      actionEl.removeEventListener('mouseup', guard, true);
-    }
-    if (keydownGuard) {
-      actionEl.removeEventListener('keydown', keydownGuard, true);
-    }
-
-    delete actionEl._gfProtectedGuard;
-    delete actionEl._gfProtectedKeydownGuard;
-    delete actionEl.dataset.gfProtectedAction;
-    delete actionEl.dataset.gfProtected;
-
-    actionEl.classList.remove('gf-protected-action');
-    actionEl.removeAttribute('aria-disabled');
-    actionEl.removeAttribute('tabindex');
-    actionEl.removeAttribute('title');
-    actionEl.removeAttribute('aria-label');
-
-    if ('disabled' in actionEl) {
-      actionEl.disabled = false;
-    }
-
-    const label = actionEl.querySelector('span:last-child') || actionEl.querySelector('.mdc-list-item__primary-text') || actionEl;
-    const originalLabel = actionEl.dataset.gfProtectedOriginalLabel;
-    if (label && originalLabel) {
-      label.textContent = originalLabel;
-    }
-    delete actionEl.dataset.gfProtectedOriginalLabel;
+    actionEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        guard(event);
+      }
+    }, true);
   }
 
   function ensurePinnedState(link, pinned) {
@@ -149,23 +103,15 @@
     if (Date.now() - context.at > 5000) return;
 
     const isPinned = shared.isHrefPinned(context.href);
-    const deleteButton = menu.querySelector('[data-action="delete"]');
-    if (!isPinned) {
-      enableActionElement(deleteButton);
-      return;
-    }
+    if (!isPinned) return;
 
+    const deleteButton = menu.querySelector('[data-action="delete"]');
     disableActionElement(deleteButton, 'Protected');
   }
 
   function patchNativeMenuIfNeeded() {
-    const contextPinned = !!(
-      lastCustomMenuContext
-      && Date.now() - lastCustomMenuContext.at <= 5000
-      && shared.isHrefPinned(lastCustomMenuContext.href)
-    );
     const currentPinned = shared.isCurrentChatPinned();
-    const shouldProtect = contextPinned || currentPinned;
+    if (!currentPinned) return;
 
     const panes = [...document.querySelectorAll('.cdk-overlay-pane')];
     if (!panes.length) return;
@@ -180,22 +126,20 @@
     if (!pane) return;
 
     const items = [...pane.querySelectorAll('[role="menuitem"], button.mat-mdc-menu-item')];
-    const deleteTerms = Array.isArray(window.GFMenuActionTerms?.deleteTerms)
-      ? window.GFMenuActionTerms.deleteTerms
-      : [
-        'delete',
-        'remove',
-        'eliminar',
-        'elimina',
-        'supprimer',
-        'löschen',
-        'excluir',
-        'cancella',
-        '削除',
-        '删除',
-        '삭제',
-        'удал'
-      ];
+    const deleteTerms = [
+      'delete',
+      'remove',
+      'eliminar',
+      'elimina',
+      'supprimer',
+      'löschen',
+      'excluir',
+      'cancella',
+      '削除',
+      '删除',
+      '삭제',
+      'удал'
+    ];
 
     const hasDeleteIcon = (item) => {
       if (!item) return false;
@@ -222,11 +166,6 @@
     };
 
     const deleteItem = items.find((item) => hasDeleteIcon(item) || hasDeleteTextHint(item));
-    if (!shouldProtect) {
-      enableActionElement(deleteItem);
-      return;
-    }
-
     disableActionElement(deleteItem, 'Protected');
   }
 

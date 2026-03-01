@@ -1,8 +1,7 @@
 (() => {
   const ROOT_ID = 'gf-sidebar-root';
   const STORAGE_KEY = 'gfStateV1';
-  const STORAGE_SCHEMA_VERSION = 2;
-  const STORAGE_COMPACTION_INTERVAL_MS = 60 * 1000;
+  const STORAGE_SCHEMA_VERSION = 1;
   const SIDEBAR_SELECTOR = 'side-navigation-content';
   const CHAT_SELECTORS = window.GFSharedUtils?.CONVERSATION_SELECTORS || [
     'a[data-test-id="conversation"]',
@@ -21,16 +20,6 @@
     inputWidth: 92,
     buttonSize: 12
   };
-
-  const PERF_BUDGET = {
-    minTickIntervalMs: 24,
-    maxMutationsPerBatch: 240,
-    perfLogIntervalMs: 5000
-  };
-
-  const supportsHasSelector = typeof CSS !== 'undefined'
-    && typeof CSS.supports === 'function'
-    && CSS.supports('selector(:has(*))');
 
   const state = {
     folders: [],
@@ -59,9 +48,6 @@
   };
 
   const sourceChats = new Map();
-  let stateMeta = {
-    lastCompactedAt: 0
-  };
   let root = null;
   let observer = null;
   let saveTimer = null;
@@ -78,36 +64,10 @@
   let debugColorsEnabled = false;
   let showAllHamburgersEnabled = false;
   let selectorWarningShown = false;
-  let lastNativeMenuChatContext = null;
-  let nativeMenuIntentListenerBound = false;
-  let silentPinStyleEl = null;
-  let silentPinOverlayHideTimer = null;
-  let lastTickAt = 0;
-  let delayedTickTimer = null;
-  let lastCompactionAt = 0;
-  const perfStats = {
-    mutationsSeen: 0,
-    mutationBursts: 0,
-    ticksRequested: 0,
-    ticksRun: 0,
-    lastPerfLogAt: 0
-  };
 
   function debugLog(context, error) {
     if (localStorage.getItem('gfDebug') !== '1') return;
-    console.debug('[Gemini Folders and Protected Files Content]', context, error);
-  }
-
-  function recordPerfSnapshot(reason) {
-    const now = Date.now();
-    if (now - perfStats.lastPerfLogAt < PERF_BUDGET.perfLogIntervalMs) return;
-    perfStats.lastPerfLogAt = now;
-    debugLog(`Perf snapshot (${reason})`, {
-      mutationsSeen: perfStats.mutationsSeen,
-      mutationBursts: perfStats.mutationBursts,
-      ticksRequested: perfStats.ticksRequested,
-      ticksRun: perfStats.ticksRun
-    });
+    console.debug('[Gemini Folders Content]', context, error);
   }
 
   const storage = {
@@ -141,33 +101,6 @@
     return window.GFSharedUtils?.parseChatId(href, title) || '';
   }
 
-  function getMenuActionTerms() {
-    const shared = window.GFMenuActionTerms;
-    const sharedActions = shared?.chatActions || {};
-    return {
-      share: sharedActions.share || {
-        icons: ['share'],
-        terms: ['share conversation', 'share']
-      },
-      pinOn: sharedActions.pinOn || {
-        icons: ['push_pin', 'keep_off'],
-        terms: ['pin', 'anclar', 'fixer', 'heften', 'fixar', 'fissa', '固定', 'закреп']
-      },
-      pinOff: sharedActions.pinOff || {
-        icons: ['keep_off', 'push_pin'],
-        terms: ['unpin', 'un pin', 'desanclar', 'desfijar', 'détacher', 'lösen', '解除固定', 'закреп']
-      },
-      rename: sharedActions.rename || {
-        icons: ['edit', 'drive_file_rename_outline'],
-        terms: ['rename', 'edit name', 'renombrar', 'renommer', 'umbenennen', 'rinomina', '名前を変更', '重命名']
-      },
-      delete: sharedActions.delete || {
-        icons: ['delete'],
-        terms: ['delete', 'remove', 'eliminar', 'supprimer', 'löschen', 'excluir', 'cancella', '削除', '删除', '삭제', 'удал']
-      }
-    };
-  }
-
   function isSidebarExpanded() {
     const appRoot = document.querySelector('chat-app');
     if (appRoot?.classList.contains('side-nav-open')) return true;
@@ -198,23 +131,14 @@
   }
 
   function extractChatsFromDom() {
-    const lookup = window.GFSharedUtils?.getConversationLinks?.(document) || {
-      links: [],
-      sourceSelector: CHAT_SELECTORS[0],
-      ok: false,
-      score: 0,
-      fallbackMode: 'none'
-    };
+    const lookup = window.GFSharedUtils?.getConversationLinks?.(document) || { links: [], sourceSelector: CHAT_SELECTORS[0], ok: false };
     const links = lookup.links;
     const activeSelector = lookup.sourceSelector;
-    const selectorScore = Number.isFinite(lookup.score) ? lookup.score : 0;
-    const isHeuristicFallback = lookup.fallbackMode === 'heuristic';
-    const debugMode = getDebugModeEnabled();
 
     if (!links.length && !selectorWarningShown && root) {
       selectorWarningShown = true;
       state.selectorDegraded = true;
-      state.status = 'Gemini layout changed. Conversation sync is unavailable.';
+      state.status = 'Gemini layout changed. Conversation sync fallback is active.';
       clearTimeout(statusTimer);
       statusTimer = setTimeout(() => {
         state.status = '';
@@ -222,24 +146,9 @@
       }, 3000);
       render();
       debugLog('No conversation selectors matched', { selectors: CHAT_SELECTORS });
-    } else if (links.length && debugMode && (isHeuristicFallback || selectorScore < 60)) {
-      selectorWarningShown = true;
-      state.selectorDegraded = true;
-      state.status = isHeuristicFallback
-        ? 'Conversation sync running in heuristic fallback mode.'
-        : `Conversation selector health is degraded (${selectorScore}%).`;
-      clearTimeout(statusTimer);
-      statusTimer = setTimeout(() => {
-        state.status = '';
-        render();
-      }, 2600);
-      render();
     } else if (links.length) {
       selectorWarningShown = false;
       state.selectorDegraded = false;
-      if (!debugMode && state.status) {
-        state.status = '';
-      }
     }
 
     const chats = [];
@@ -323,12 +232,7 @@
         folders: state.folders,
         chatAssignments: state.chatAssignments,
         deletedChats: state.deletedChats,
-        folderOpen: state.folderOpen,
-        meta: {
-          lastCompactedAt: Number.isFinite(stateMeta.lastCompactedAt)
-            ? stateMeta.lastCompactedAt
-            : 0
-        }
+        folderOpen: state.folderOpen
       };
       await storage.set(payload);
     }, 200);
@@ -344,17 +248,6 @@
     };
   }
 
-  function migrateV1ToV2(payload) {
-    const base = migrateV0ToV1(payload);
-    return {
-      ...base,
-      schemaVersion: 2,
-      meta: {
-        lastCompactedAt: Number(payload?.meta?.lastCompactedAt) || 0
-      }
-    };
-  }
-
   function migrateStoredState(rawPayload) {
     const original = rawPayload && typeof rawPayload === 'object' ? rawPayload : {};
     const originalVersion = Number.isInteger(original.schemaVersion) ? original.schemaVersion : 0;
@@ -365,11 +258,6 @@
       if (currentVersion === 0) {
         payload = migrateV0ToV1(payload);
         currentVersion = 1;
-        continue;
-      }
-      if (currentVersion === 1) {
-        payload = migrateV1ToV2(payload);
-        currentVersion = 2;
         continue;
       }
       break;
@@ -383,47 +271,6 @@
     };
   }
 
-  function compactStateAgainstSourceChats({ force = false } = {}) {
-    const now = Date.now();
-    if (!force && now - lastCompactionAt < STORAGE_COMPACTION_INTERVAL_MS) return false;
-    lastCompactionAt = now;
-
-    const validChatIds = new Set(sourceChats.keys());
-    let changed = false;
-
-    for (const chatId of Object.keys(state.chatAssignments)) {
-      if (!validChatIds.has(chatId)) {
-        delete state.chatAssignments[chatId];
-        changed = true;
-      }
-    }
-
-    for (const chatId of Object.keys(state.deletedChats)) {
-      if (!validChatIds.has(chatId)) {
-        delete state.deletedChats[chatId];
-        changed = true;
-      }
-    }
-
-    for (const chatId of Object.keys(state.selectedChats)) {
-      if (!validChatIds.has(chatId)) {
-        delete state.selectedChats[chatId];
-        changed = true;
-      }
-    }
-
-    if (changed) {
-      stateMeta.lastCompactedAt = now;
-      queueSave();
-      debugLog('State compaction applied', {
-        chatAssignments: Object.keys(state.chatAssignments).length,
-        deletedChats: Object.keys(state.deletedChats).length
-      });
-    }
-
-    return changed;
-  }
-
   function closeFolderModal() {
     if (!activeFolderModal) return;
     const { overlay, onKeydown } = activeFolderModal;
@@ -434,145 +281,20 @@
 
   function closeFolderActionsMenu() {
     if (!activeFolderActionsMenu) return;
-    const { panel, onDocClick, onKeydown, anchorElement } = activeFolderActionsMenu;
+    const { panel, onDocClick, onKeydown } = activeFolderActionsMenu;
     document.removeEventListener('mousedown', onDocClick, true);
     document.removeEventListener('keydown', onKeydown);
     panel.remove();
-    anchorElement?.setAttribute('aria-expanded', 'false');
     activeFolderActionsMenu = null;
   }
 
   function closeChatActionsMenu() {
     if (!activeChatActionsMenu) return;
-    const { panel, onDocClick, onKeydown, anchorElement } = activeChatActionsMenu;
+    const { panel, onDocClick, onKeydown } = activeChatActionsMenu;
     document.removeEventListener('mousedown', onDocClick, true);
     document.removeEventListener('keydown', onKeydown);
     panel.remove();
-    anchorElement?.setAttribute('aria-expanded', 'false');
     activeChatActionsMenu = null;
-  }
-
-  function bindMenuKeyboardNavigation(panel) {
-    const items = [...panel.querySelectorAll('.gf-folder-actions-item')];
-    if (!items.length) return;
-
-    const focusByOffset = (offset) => {
-      const current = document.activeElement;
-      const currentIndex = items.indexOf(current);
-      const nextIndex = currentIndex < 0
-        ? 0
-        : (currentIndex + offset + items.length) % items.length;
-      items[nextIndex]?.focus();
-    };
-
-    panel.addEventListener('keydown', (event) => {
-      if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        focusByOffset(1);
-      }
-      if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        focusByOffset(-1);
-      }
-      if (event.key === 'Home') {
-        event.preventDefault();
-        items[0]?.focus();
-      }
-      if (event.key === 'End') {
-        event.preventDefault();
-        items[items.length - 1]?.focus();
-      }
-    });
-
-    items[0]?.focus();
-  }
-
-  function hasMatchingIconToken(item, iconNames = []) {
-    if (!item) return false;
-
-    for (const iconName of iconNames) {
-      if (item.querySelector(`[data-mat-icon-name="${iconName}"], [fonticon="${iconName}"]`)) {
-        return true;
-      }
-    }
-
-    const normalizedIcons = iconNames.map((value) => (value || '').trim().toLowerCase());
-    const iconLikeNodes = item.querySelectorAll('[aria-hidden="true"], .google-symbols, mat-icon, [data-mat-icon-name], [fonticon]');
-    for (const node of iconLikeNodes) {
-      const iconText = (node.textContent || '').trim().toLowerCase();
-      if (normalizedIcons.includes(iconText)) return true;
-    }
-
-    return false;
-  }
-
-  function hasMatchingTextToken(item, terms = []) {
-    if (!item) return false;
-    const raw = [
-      item.getAttribute('aria-label') || '',
-      item.getAttribute('title') || '',
-      item.textContent || ''
-    ].join(' ').toLowerCase();
-    return terms.some((term) => raw.includes((term || '').toLowerCase()));
-  }
-
-  function getNativeMenuActionIntent(item) {
-    if (!item) return null;
-    const menuTerms = getMenuActionTerms();
-
-    const isUnpin = hasMatchingIconToken(item, menuTerms.pinOff.icons)
-      || hasMatchingTextToken(item, menuTerms.pinOff.terms);
-    if (isUnpin) return 'unpin';
-
-    const isPin = hasMatchingIconToken(item, menuTerms.pinOn.icons)
-      || hasMatchingTextToken(item, menuTerms.pinOn.terms);
-    if (isPin) return 'pin';
-
-    return null;
-  }
-
-  function bindNativeMenuIntentListener() {
-    if (nativeMenuIntentListenerBound) return;
-    nativeMenuIntentListenerBound = true;
-
-    const handleNativeMenuIntent = (event, phase) => {
-      const item = event.target?.closest?.('[role="menuitem"], button.mat-mdc-menu-item');
-      if (!item) return;
-
-      const pane = item.closest('.cdk-overlay-pane');
-      if (!pane) return;
-      if (!pane.querySelector('[role="menu"], .mat-mdc-menu-panel')) return;
-
-      const intent = getNativeMenuActionIntent(item);
-      if (intent === 'pin') {
-        if (phase === 'pre') {
-          beginSilentPinWindow();
-        }
-        if (phase === 'commit') {
-          autoCompleteNativePinDialog(lastNativeMenuChatContext || {});
-        }
-      }
-
-      if (intent === 'unpin' && lastNativeMenuChatContext && phase === 'commit') {
-        lastNativeMenuChatContext = {
-          ...lastNativeMenuChatContext,
-          pinned: false,
-          at: Date.now()
-        };
-      }
-    };
-
-    document.addEventListener('pointerdown', (event) => {
-      handleNativeMenuIntent(event, 'pre');
-    }, true);
-
-    document.addEventListener('mousedown', (event) => {
-      handleNativeMenuIntent(event, 'pre');
-    }, true);
-
-    document.addEventListener('click', (event) => {
-      handleNativeMenuIntent(event, 'commit');
-    }, true);
   }
 
   function findNativeChatActionButton(chat) {
@@ -594,137 +316,28 @@
     }) || null;
   }
 
-  function ensureSilentPinStyle() {
-    if (silentPinStyleEl) return;
-    const style = document.createElement('style');
-    style.id = 'gf-silent-pin-style';
-    style.textContent = `
-      .gf-silent-pin-window .cdk-overlay-pane,
-      .gf-silent-pin-window .cdk-overlay-backdrop,
-      .gf-silent-pin-window [role="dialog"],
-      .gf-silent-pin-window .mat-mdc-dialog-container,
-      .gf-silent-pin-window mat-dialog-container {
-        opacity: 0 !important;
-        visibility: hidden !important;
-        pointer-events: none !important;
-      }
-      .gf-silent-pin-pane {
-        opacity: 0 !important;
-        pointer-events: none !important;
-      }
-      .gf-silent-pin-pane [role="dialog"],
-      .gf-silent-pin-pane .mat-mdc-dialog-container,
-      .gf-silent-pin-pane mat-dialog-container {
-        visibility: hidden !important;
-      }
-    `;
-    document.head.appendChild(style);
-    silentPinStyleEl = style;
-  }
-
-  function beginSilentPinWindow() {
-    ensureSilentPinStyle();
-    document.documentElement.classList.add('gf-silent-pin-window');
-
-    if (silentPinOverlayHideTimer) {
-      clearTimeout(silentPinOverlayHideTimer);
-    }
-    silentPinOverlayHideTimer = setTimeout(() => {
-      document.documentElement.classList.remove('gf-silent-pin-window');
-      silentPinOverlayHideTimer = null;
-    }, 3800);
-  }
-
-  function endSilentPinWindow() {
-    document.documentElement.classList.remove('gf-silent-pin-window');
-    if (silentPinOverlayHideTimer) {
-      clearTimeout(silentPinOverlayHideTimer);
-      silentPinOverlayHideTimer = null;
-    }
-  }
-
-  function setSilentPinPane(pane, enabled) {
-    if (!pane) return;
-    if (enabled) {
-      pane.classList.add('gf-silent-pin-pane');
-      return;
-    }
-    pane.classList.remove('gf-silent-pin-pane');
-  }
-
-  function clearSilentPinPanes() {
-    document.querySelectorAll('.gf-silent-pin-pane').forEach((pane) => {
-      pane.classList.remove('gf-silent-pin-pane');
-    });
-  }
-
-  function findActivePinDialogPane() {
-    const panes = [...document.querySelectorAll('.cdk-overlay-pane')];
-    return panes.findLast((pane) => {
-      const style = window.getComputedStyle(pane);
-      if (style.display === 'none') return false;
-      return !!pane.querySelector('[role="dialog"], .mat-mdc-dialog-container, mat-dialog-container');
-    }) || null;
-  }
-
   function autoCompleteNativePinDialog(chat) {
-    beginSilentPinWindow();
     const fallbackTitle = (chat?.title || 'Pinned chat').trim() || 'Pinned chat';
     let attempts = 0;
-    const maxAttempts = 28;
+    const maxAttempts = 20;
 
-    const clickConfirmAction = (dialogPane) => {
-      const actions = [...dialogPane.querySelectorAll('button, [role="button"], .mdc-button, .mat-mdc-button')].filter((button) => {
-        return !button.hasAttribute('disabled') && button.getAttribute('aria-disabled') !== 'true';
-      });
-
-      const confirmByText = actions.find((button) => {
-        const text = (button.textContent || '').trim().toLowerCase();
-        return /^(pin|save|done|confirm)$/i.test(text)
-          || /(pin|save|confirm|done|apply|submit|ok|continue|next)/i.test(text);
-      });
-      if (confirmByText) {
-        confirmByText.click();
-        return true;
-      }
-
-      const dialogActions = [
-        ...dialogPane.querySelectorAll('.mat-mdc-dialog-actions button, [mat-dialog-actions] button')
-      ].filter((button) => !button.hasAttribute('disabled') && button.getAttribute('aria-disabled') !== 'true');
-      const trailingAction = dialogActions[dialogActions.length - 1];
-      if (trailingAction) {
-        trailingAction.click();
-        return true;
-      }
-
-      const lastEnabled = actions[actions.length - 1];
-      if (lastEnabled) {
-        lastEnabled.click();
-        return true;
-      }
-
-      return false;
-    };
-
-    const stop = () => {
-      clearSilentPinPanes();
-      endSilentPinWindow();
+    const isVisible = (element) => {
+      if (!element) return false;
+      const style = window.getComputedStyle(element);
+      return style.display !== 'none' && style.visibility !== 'hidden';
     };
 
     const completeOnce = () => {
       attempts += 1;
 
-      const dialogPane = findActivePinDialogPane();
+      const panes = [...document.querySelectorAll('.cdk-overlay-pane')].filter((pane) => isVisible(pane));
+      const dialogPane = panes.findLast((pane) => {
+        return !!pane.querySelector('[role="dialog"], .mat-mdc-dialog-container, mat-dialog-container');
+      });
 
       if (!dialogPane) {
-        if (attempts >= maxAttempts) {
-          stop();
-          return false;
-        }
-        return true;
+        return attempts < maxAttempts;
       }
-
-      setSilentPinPane(dialogPane, true);
 
       const input = dialogPane.querySelector('input[type="text"], input:not([type]), textarea');
       if (input && !(input.value || '').trim()) {
@@ -734,16 +347,21 @@
         input.dispatchEvent(new Event('change', { bubbles: true }));
       }
 
-      if (clickConfirmAction(dialogPane)) {
-        stop();
+      const actions = [...dialogPane.querySelectorAll('button, [role="button"], .mdc-button, .mat-mdc-button')].filter((button) => {
+        return !button.hasAttribute('disabled') && button.getAttribute('aria-disabled') !== 'true';
+      });
+
+      const confirm = actions.find((button) => {
+        const text = (button.textContent || '').trim();
+        return /^pin$/i.test(text) || /^(save|done|confirm)$/i.test(text);
+      });
+
+      if (confirm) {
+        confirm.click();
         return false;
       }
 
-      if (attempts >= maxAttempts) {
-        stop();
-        return false;
-      }
-      return true;
+      return attempts < maxAttempts;
     };
 
     const timer = setInterval(() => {
@@ -754,39 +372,72 @@
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const keepGoing = completeOnce();
-        if (!keepGoing) {
-          clearInterval(timer);
-          stop();
-        }
+        if (!keepGoing) clearInterval(timer);
       });
     });
 
-    setTimeout(() => {
-      clearInterval(timer);
-      stop();
-    }, 3200);
+    setTimeout(() => clearInterval(timer), 2200);
   }
 
   function executeNativeChatMenuAction(chat, action, anchorElement = null) {
     const normalizeText = (value) => (value || '').trim().toLowerCase();
-    const menuTerms = getMenuActionTerms();
     const actionConfig = {
-      share: menuTerms.share,
+      share: {
+        icons: ['share'],
+        terms: ['share conversation', 'share']
+      },
       pin: chat.pinned
-        ? menuTerms.pinOff
-        : menuTerms.pinOn,
-      rename: menuTerms.rename,
-      delete: menuTerms.delete
+        ? {
+          icons: ['keep_off', 'push_pin'],
+          terms: ['unpin', 'un pin', 'desanclar', 'desfijar', 'détacher', 'lösen', '解除固定', 'закреп']
+        }
+        : {
+          icons: ['push_pin', 'keep_off'],
+          terms: ['pin', 'anclar', 'fixer', 'heften', 'fixar', 'fissa', '固定', 'закреп']
+        },
+      rename: {
+        icons: ['edit', 'drive_file_rename_outline'],
+        terms: ['rename', 'edit name', 'renombrar', 'renommer', 'umbenennen', 'rinomina', '名前を変更', '重命名']
+      },
+      delete: {
+        icons: ['delete'],
+        terms: ['delete', 'remove', 'eliminar', 'supprimer', 'löschen', 'excluir', 'cancella', '削除', '删除', '삭제', 'удал']
+      }
+    };
+
+    const hasMatchingIcon = (item, iconNames) => {
+      for (const iconName of iconNames) {
+        if (item.querySelector(`[data-mat-icon-name="${iconName}"], [fonticon="${iconName}"]`)) {
+          return true;
+        }
+      }
+
+      const iconLikeNodes = item.querySelectorAll('[aria-hidden="true"], .google-symbols, mat-icon, [data-mat-icon-name], [fonticon]');
+      for (const node of iconLikeNodes) {
+        const iconText = normalizeText(node.textContent || '');
+        if (iconNames.includes(iconText)) return true;
+      }
+
+      return false;
+    };
+
+    const hasMatchingTerm = (item, terms) => {
+      const raw = [
+        item.getAttribute('aria-label') || '',
+        item.getAttribute('title') || '',
+        item.textContent || ''
+      ].join(' ').toLowerCase();
+      return terms.some((term) => raw.includes(term));
     };
 
     const findActionItem = (items) => {
       const config = actionConfig[action];
       if (!config) return null;
 
-      const byIcon = items.find((item) => hasMatchingIconToken(item, config.icons));
+      const byIcon = items.find((item) => hasMatchingIcon(item, config.icons));
       if (byIcon) return byIcon;
 
-      const byTerm = items.find((item) => hasMatchingTextToken(item, config.terms));
+      const byTerm = items.find((item) => hasMatchingTerm(item, config.terms));
       if (byTerm) return byTerm;
 
       return null;
@@ -813,6 +464,9 @@
         }
         target?.click();
 
+        if (action === 'pin' && !chat.pinned) {
+          autoCompleteNativePinDialog(chat);
+        }
       });
     });
   }
@@ -825,7 +479,6 @@
 
     const panel = document.createElement('div');
     panel.className = 'gf-folder-actions-menu-panel gf-chat-actions-menu-panel';
-    panel.setAttribute('role', 'menu');
     panel.innerHTML = `
       <button class="gf-folder-actions-item" type="button" data-action="share"><span class="google-symbols gf-folder-actions-item-icon" aria-hidden="true">share</span><span>Share conversation</span></button>
       <button class="gf-folder-actions-item" type="button" data-action="pin"><span class="google-symbols gf-folder-actions-item-icon" aria-hidden="true">${pinIcon}</span><span>${pinLabel}</span></button>
@@ -833,12 +486,7 @@
       <button class="gf-folder-actions-item" type="button" data-action="delete"><span class="google-symbols gf-folder-actions-item-icon" aria-hidden="true">delete</span><span>Delete</span></button>
     `;
 
-    panel.querySelectorAll('.gf-folder-actions-item').forEach((item) => {
-      item.setAttribute('role', 'menuitem');
-    });
-
     document.body.appendChild(panel);
-    anchorElement?.setAttribute('aria-expanded', 'true');
 
     const anchorRect = anchorElement.getBoundingClientRect();
     const panelRect = panel.getBoundingClientRect();
@@ -858,8 +506,6 @@
       });
     });
 
-    bindMenuKeyboardNavigation(panel);
-
     const onDocClick = (event) => {
       if (panel.contains(event.target) || anchorElement.contains(event.target)) return;
       closeChatActionsMenu();
@@ -870,7 +516,7 @@
 
     document.addEventListener('mousedown', onDocClick, true);
     document.addEventListener('keydown', onKeydown);
-    activeChatActionsMenu = { panel, onDocClick, onKeydown, anchorElement };
+    activeChatActionsMenu = { panel, onDocClick, onKeydown };
   }
 
   function openFolderActionsMenu(folder, anchorElement) {
@@ -878,18 +524,12 @@
 
     const panel = document.createElement('div');
     panel.className = 'gf-folder-actions-menu-panel';
-    panel.setAttribute('role', 'menu');
     panel.innerHTML = `
       <button class="gf-folder-actions-item" type="button" data-action="rename"><span class="google-symbols gf-folder-actions-item-icon" aria-hidden="true">edit</span><span>Rename</span></button>
       <button class="gf-folder-actions-item" type="button" data-action="delete"><span class="google-symbols gf-folder-actions-item-icon" aria-hidden="true">delete</span><span>Delete</span></button>
     `;
 
-    panel.querySelectorAll('.gf-folder-actions-item').forEach((item) => {
-      item.setAttribute('role', 'menuitem');
-    });
-
     document.body.appendChild(panel);
-    anchorElement?.setAttribute('aria-expanded', 'true');
 
     const anchorRect = anchorElement.getBoundingClientRect();
     const panelRect = panel.getBoundingClientRect();
@@ -910,8 +550,6 @@
       onDeleteFolder(folder.id);
     });
 
-    bindMenuKeyboardNavigation(panel);
-
     const onDocClick = (event) => {
       if (panel.contains(event.target) || anchorElement.contains(event.target)) return;
       closeFolderActionsMenu();
@@ -922,7 +560,7 @@
 
     document.addEventListener('mousedown', onDocClick, true);
     document.addEventListener('keydown', onKeydown);
-    activeFolderActionsMenu = { panel, onDocClick, onKeydown, anchorElement };
+    activeFolderActionsMenu = { panel, onDocClick, onKeydown };
   }
 
   function closeBottomSheet() {
@@ -994,32 +632,26 @@
       return;
     }
 
+    const options = topFolders
+      .map((folder) => `<button class="gf-bottom-folder-option" type="button" data-folder-id="${folder.id}">${folder.emoji || '📁'} ${folder.name}</button>`)
+      .join('');
+
     openBottomSheet(`
       <div class="gf-bottom-sheet-card">
         <div class="gf-bottom-sheet-title">Move to Folder</div>
         <div class="gf-bottom-sheet-text">Choose where to move ${selected.length} selected chat${selected.length === 1 ? '' : 's'}.</div>
-        <div class="gf-bottom-folder-list"></div>
+        <div class="gf-bottom-folder-list">${options}</div>
         <div class="gf-bottom-sheet-actions">
           <button class="gf-bottom-btn gf-bottom-btn-muted" type="button" data-action="cancel">Cancel</button>
         </div>
       </div>
     `, (panel) => {
-      const folderList = panel.querySelector('.gf-bottom-folder-list');
-      if (folderList) {
-        for (const folder of topFolders) {
-          const button = document.createElement('button');
-          button.className = 'gf-bottom-folder-option';
-          button.type = 'button';
-          button.setAttribute('data-folder-id', folder.id);
-          button.textContent = `${folder.emoji || '📁'} ${folder.name}`;
-          button.addEventListener('click', () => {
-            moveSelectedChatsToFolder(folder.id);
-          });
-          folderList.appendChild(button);
-        }
-      }
-
       panel.querySelector('[data-action="cancel"]')?.addEventListener('click', closeBottomSheet);
+      panel.querySelectorAll('.gf-bottom-folder-option').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          moveSelectedChatsToFolder(btn.getAttribute('data-folder-id'));
+        });
+      });
     });
   }
 
@@ -1626,18 +1258,6 @@
 
   function scheduleTick() {
     if (tickScheduled) return;
-    perfStats.ticksRequested += 1;
-
-    const elapsed = performance.now() - lastTickAt;
-    if (elapsed < PERF_BUDGET.minTickIntervalMs) {
-      if (delayedTickTimer) return;
-      delayedTickTimer = setTimeout(() => {
-        delayedTickTimer = null;
-        scheduleTick();
-      }, PERF_BUDGET.minTickIntervalMs - elapsed);
-      return;
-    }
-
     tickScheduled = true;
     requestAnimationFrame(() => {
       tickScheduled = false;
@@ -1845,14 +1465,6 @@
   }
 
   function triggerNativeChatActions(chat, anchorElement = null) {
-    lastNativeMenuChatContext = {
-      id: chat?.id || '',
-      href: chat?.href || '',
-      title: chat?.title || '',
-      pinned: !!chat?.pinned,
-      at: Date.now()
-    };
-
     const actionBtn = findNativeChatActionButton(chat);
 
     if (actionBtn) {
@@ -1882,46 +1494,21 @@
     const selected = !!state.selectedChats[chat.id];
     const inSelectMode = state.selectMode;
 
-    const chatMain = document.createElement('div');
-    chatMain.className = 'gf-chat-main';
+    row.innerHTML = `
+      <div class="gf-chat-main">
+        <a class="gf-chat-link" href="${chat.href}">${chat.title}</a>
+      </div>
+      <div class="conversation-actions-container gf-conversation-actions">
+        ${inSelectMode
+          ? `<input type="checkbox" class="gf-chat-select-action" aria-label="Select ${chat.title}" ${selected ? 'checked' : ''} />`
+          : `<button class="conversation-actions-menu-button gf-chat-actions-menu-button" type="button" title="More options" aria-label="More options for ${chat.title}">
+              <span class="google-symbols gf-chat-actions-icon" aria-hidden="true">more_vert</span>
+            </button>`}
+      </div>
+    `;
 
-    const link = document.createElement('a');
-    link.className = 'gf-chat-link';
-    link.setAttribute('href', chat.href || '#');
-    link.textContent = chat.title || 'Untitled chat';
-    chatMain.appendChild(link);
-
-    const actionsContainer = document.createElement('div');
-    actionsContainer.className = 'conversation-actions-container gf-conversation-actions';
-
-    let checkbox = null;
-    if (inSelectMode) {
-      checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.className = 'gf-chat-select-action';
-      checkbox.setAttribute('aria-label', `Select ${chat.title || 'chat'}`);
-      checkbox.checked = selected;
-      actionsContainer.appendChild(checkbox);
-    } else {
-      const actionsButton = document.createElement('button');
-      actionsButton.className = 'conversation-actions-menu-button gf-chat-actions-menu-button';
-      actionsButton.type = 'button';
-      actionsButton.title = 'More options';
-      actionsButton.setAttribute('aria-label', `More options for ${chat.title || 'chat'}`);
-      actionsButton.setAttribute('aria-haspopup', 'menu');
-      actionsButton.setAttribute('aria-expanded', 'false');
-
-      const icon = document.createElement('span');
-      icon.className = 'google-symbols gf-chat-actions-icon';
-      icon.setAttribute('aria-hidden', 'true');
-      icon.textContent = 'more_vert';
-      actionsButton.appendChild(icon);
-      actionsContainer.appendChild(actionsButton);
-    }
-
-    row.appendChild(chatMain);
-    row.appendChild(actionsContainer);
-
+    const checkbox = row.querySelector('.gf-chat-select-action');
+    const link = row.querySelector('.gf-chat-link');
     if (link) link.draggable = false;
 
     const toggleRowSelection = () => {
@@ -1985,8 +1572,7 @@
     actionsButton?.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
-      closeChatActionsMenu();
-      triggerNativeChatActions(chat, actionsButton);
+      openChatActionsMenu(chat, actionsButton);
     });
 
     return row;
@@ -2005,89 +1591,29 @@
     const nestedElementCount = getFolderNestedElementCount(folder.id);
     const showCollapsedCount = nestedElementCount > 0;
 
-    const folderHead = document.createElement('div');
-    folderHead.className = 'gf-folder-head';
-    folderHead.setAttribute('role', 'button');
-    folderHead.setAttribute('tabindex', '0');
-    folderHead.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    wrapper.innerHTML = `
+      <div class="gf-folder-head" role="button" tabindex="0" aria-expanded="${collapsed ? 'false' : 'true'}">
+        <div class="gf-folder-title">
+          <span class="folder-icon" data-folder-index="${folderIndex}" title="Click to change icon">${folder.emoji || '📁'}</span>
+          <span class="gf-folder-title-text">${folder.name}</span>
+          ${showCollapsedCount ? `<span class="gf-folder-collapsed-count" aria-label="${nestedElementCount} hidden items">${nestedElementCount}</span>` : ''}
+        </div>
+        <div class="gf-folder-actions">
+          ${depth === 0 ? '<button class="gf-folder-action gf-folder-sub-add" type="button" title="Create subfolder" aria-label="Create subfolder">+</button>' : ''}
+          <button class="gf-folder-actions-menu-button" type="button" title="Additional options" aria-label="Additional options for ${folder.name}">
+            <span class="google-symbols gf-folder-actions-icon" aria-hidden="true">more_vert</span>
+          </button>
+        </div>
+      </div>
+      ${shouldRenderBody ? '<div class="gf-folder-body"></div>' : ''}
+    `;
 
-    const folderTitle = document.createElement('div');
-    folderTitle.className = 'gf-folder-title';
-
-    const folderIcon = document.createElement('span');
-    folderIcon.className = 'folder-icon';
-    folderIcon.setAttribute('data-folder-index', String(folderIndex));
-    folderIcon.title = 'Click to change icon';
-    folderIcon.textContent = folder.emoji || '📁';
-
-    const folderTitleText = document.createElement('span');
-    folderTitleText.className = 'gf-folder-title-text';
-    folderTitleText.textContent = folder.name || 'Folder';
-
-    folderTitle.appendChild(folderIcon);
-    folderTitle.appendChild(folderTitleText);
-
-    if (showCollapsedCount) {
-      const countBadge = document.createElement('span');
-      countBadge.className = 'gf-folder-collapsed-count';
-      countBadge.setAttribute('aria-label', `${nestedElementCount} hidden items`);
-      countBadge.textContent = String(nestedElementCount);
-      folderTitle.appendChild(countBadge);
-    }
-
-    const folderActions = document.createElement('div');
-    folderActions.className = 'gf-folder-actions';
-
-    if (depth === 0) {
-      const addSubBtn = document.createElement('button');
-      addSubBtn.className = 'gf-folder-action gf-folder-sub-add';
-      addSubBtn.type = 'button';
-      addSubBtn.title = 'Create subfolder';
-      addSubBtn.setAttribute('aria-label', 'Create subfolder');
-      addSubBtn.textContent = '+';
-      folderActions.appendChild(addSubBtn);
-    }
-
-    const actionsMenuButton = document.createElement('button');
-    actionsMenuButton.className = 'gf-folder-actions-menu-button';
-    actionsMenuButton.type = 'button';
-    actionsMenuButton.title = 'Additional options';
-    actionsMenuButton.setAttribute('aria-label', `Additional options for ${folder.name || 'folder'}`);
-    actionsMenuButton.setAttribute('aria-haspopup', 'menu');
-    actionsMenuButton.setAttribute('aria-expanded', 'false');
-
-    const actionsMenuIcon = document.createElement('span');
-    actionsMenuIcon.className = 'google-symbols gf-folder-actions-icon';
-    actionsMenuIcon.setAttribute('aria-hidden', 'true');
-    actionsMenuIcon.textContent = 'more_vert';
-    actionsMenuButton.appendChild(actionsMenuIcon);
-    folderActions.appendChild(actionsMenuButton);
-
-    folderHead.appendChild(folderTitle);
-    folderHead.appendChild(folderActions);
-    wrapper.appendChild(folderHead);
-
-    let body = null;
-    if (shouldRenderBody) {
-      body = document.createElement('div');
-      body.className = 'gf-folder-body';
-      body.id = `gf-folder-body-${folder.id}`;
-      folderHead.setAttribute('aria-controls', body.id);
-      wrapper.appendChild(body);
-    }
-
-    if (chats.length > 0) {
-      wrapper.classList.add('gf-folder-has-direct-chats');
-    }
+    const body = wrapper.querySelector('.gf-folder-body');
 
     if (body) {
-      chats.forEach((chat, index) => {
-        const chatEl = createChatElement(chat, folder.id);
-        if (index < chats.length - 1) {
-          chatEl.classList.add('gf-chat-item-has-next');
-        }
-        body.appendChild(chatEl);
-      });
+      for (const chat of chats) {
+        body.appendChild(createChatElement(chat, folder.id));
+      }
     }
 
     if (depth === 0 && children.length > 0 && body) {
@@ -2101,6 +1627,7 @@
 
     applyFolderBodyCollapseState(wrapper, body, collapsed, { animate: false });
 
+    const folderHead = wrapper.querySelector('.gf-folder-head');
     const toggleFolderCollapsed = () => {
       if (!body) return;
       const nextCollapsed = !wrapper.classList.contains('is-collapsed');
@@ -2127,7 +1654,7 @@
       toggleFolderCollapsed();
     });
 
-    folderIcon?.addEventListener('click', (event) => {
+    wrapper.querySelector('.folder-icon')?.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
       window.GFFolderEmojiSelector?.openPicker?.({
@@ -2146,7 +1673,7 @@
       if (depth === 0) onCreateFolder(folder.id);
     });
 
-    actionsMenuButton?.addEventListener('click', (event) => {
+    wrapper.querySelector('.gf-folder-actions-menu-button')?.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
       openFolderActionsMenu(folder, event.currentTarget);
@@ -2247,7 +1774,6 @@
 
     root = document.createElement('section');
     root.id = ROOT_ID;
-    root.classList.toggle('gf-no-has', !supportsHasSelector);
     root.innerHTML = `
       <div class="gf-section gf-chats">
         <div class="gf-chats-drop-zone">
@@ -2335,7 +1861,6 @@
 
   async function bootstrap() {
     bindRuntimeMessageListener();
-    bindNativeMenuIntentListener();
     await window.GFFolderEmojiSelector?.preload?.();
 
     const saved = await storage.get();
@@ -2348,24 +1873,12 @@
     state.chatAssignments = migrated.payload.chatAssignments || {};
     state.deletedChats = migrated.payload.deletedChats || {};
     state.folderOpen = migrated.payload.folderOpen || {};
-    stateMeta = {
-      lastCompactedAt: Number(migrated.payload?.meta?.lastCompactedAt) || 0
-    };
-    lastCompactionAt = stateMeta.lastCompactedAt || 0;
     sanitizeState();
 
     scheduleTick();
 
     observer = new MutationObserver((mutations) => {
       if (performance.now() < ignoreMutationsUntil) return;
-
-      perfStats.mutationsSeen += mutations.length;
-      if (mutations.length > PERF_BUDGET.maxMutationsPerBatch) {
-        perfStats.mutationBursts += 1;
-        scheduleTick();
-        recordPerfSnapshot('mutation-burst');
-        return;
-      }
 
       let shouldTick = false;
       for (const mutation of mutations) {
@@ -2382,7 +1895,6 @@
 
       if (shouldTick) {
         scheduleTick();
-        recordPerfSnapshot('observer-trigger');
       }
     });
 
@@ -2397,8 +1909,6 @@
   function tick() {
     if (tickRunning) return;
     tickRunning = true;
-    perfStats.ticksRun += 1;
-    lastTickAt = performance.now();
 
     const sidebar = document.querySelector(SIDEBAR_SELECTOR);
     if (!sidebar) {
@@ -2408,7 +1918,6 @@
     }
 
     const sourceChanged = syncSourceChats();
-    const compacted = compactStateAgainstSourceChats();
     const stateChanged = sanitizeState();
 
     if (!isSidebarExpanded()) {
@@ -2423,7 +1932,7 @@
       return;
     }
 
-    if (sourceChanged || stateChanged || compacted) {
+    if (sourceChanged || stateChanged) {
       render();
     }
     tickRunning = false;
