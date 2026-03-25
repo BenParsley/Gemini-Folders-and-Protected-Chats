@@ -12,6 +12,8 @@ Gemini Folders and Protected Files is a browser extension that improves Gemini c
 - Provide a cleaner sidebar presentation with improved spacing, alignment, and hover clarity.
 - Include popup debug controls for visual diagnostics and logging when troubleshooting is needed.
 
+EXAMPLE : 
+
 <img width="302" height="537" alt="Project-GeminiFoldersExample" src="https://github.com/user-attachments/assets/f246af2e-3e1f-4b41-9731-785b2b81c32f" />
 
 
