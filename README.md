@@ -1,5 +1,3 @@
-<img width="1332" height="863" alt="image" src="https://github.com/user-attachments/assets/eb8642d3-fec3-44c6-84f4-524841cee687" /># Gemini Folders and Protected Files
-
 Gemini Folders and Protected Files is a browser extension that improves Gemini chat organization, protected chat, and more basic sidebar usability.
 
 ## Features
